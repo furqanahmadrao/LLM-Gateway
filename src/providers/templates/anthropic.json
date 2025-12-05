@@ -1,0 +1,36 @@
+{
+  "id": "anthropic",
+  "displayName": "Anthropic",
+  "authType": "api_key",
+  "authInstructions": "Enter your Anthropic API key from https://console.anthropic.com/settings/keys",
+  "baseUrl": "https://api.anthropic.com",
+  "modelListEndpoint": null,
+  "modelListMethod": "GET",
+  "modelListHeaders": {
+    "x-api-key": "{{api_key}}",
+    "anthropic-version": "2023-06-01"
+  },
+  "modelListPathJsonPointer": null,
+  "chatCompletionEndpoint": "/v1/messages",
+  "supportsStreaming": true,
+  "requestTransform": {
+    "type": "anthropic",
+    "mapping": {
+      "messages": "messages",
+      "max_tokens": "max_tokens",
+      "temperature": "temperature",
+      "top_p": "top_p",
+      "stop": "stop_sequences"
+    }
+  },
+  "responseTransform": {
+    "type": "anthropic",
+    "mapping": {
+      "content": "choices[0].message.content",
+      "stop_reason": "choices[0].finish_reason"
+    }
+  },
+  "rateLimitInfo": "Rate limits vary by account tier",
+  "notes": "Requires request/response transformation from OpenAI format",
+  "lastVerified": "2024-01-15"
+}

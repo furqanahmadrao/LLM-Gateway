@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+ui/node_modules
+
+# Build output
+dist
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files (use docker-compose env vars instead)
+.env
+.env.local
+.env.*.local
+
+# Test files
+*.test.ts
+**/*.test.ts
+coverage
+.nyc_output
+
+# Documentation
+*.md
+!README.md
+
+# Kiro specs
+.kiro
+
+# UI (built separately if needed)
+ui
+
+# Logs
+*.log
+logs
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp
+temp
+*.tmp

@@ -1,0 +1,18 @@
+{
+  "id": "mistral",
+  "displayName": "Mistral AI",
+  "authType": "api_key",
+  "authInstructions": "Enter your Mistral API key from https://console.mistral.ai/api-keys",
+  "baseUrl": "https://api.mistral.ai",
+  "modelListEndpoint": "/v1/models",
+  "modelListMethod": "GET",
+  "modelListHeaders": {
+    "Authorization": "Bearer {{api_key}}"
+  },
+  "modelListPathJsonPointer": "/data",
+  "chatCompletionEndpoint": "/v1/chat/completions",
+  "supportsStreaming": true,
+  "rateLimitInfo": "Rate limits vary by account tier",
+  "notes": "OpenAI-compatible API format",
+  "lastVerified": "2024-01-15"
+}

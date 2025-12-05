@@ -1,0 +1,28 @@
+{
+  "id": "azure",
+  "displayName": "Azure OpenAI",
+  "authType": "api_key",
+  "authInstructions": "Enter your Azure OpenAI API key and configure your resource endpoint",
+  "baseUrl": "https://{{resource_name}}.openai.azure.com",
+  "modelListEndpoint": "/openai/deployments?api-version=2023-05-15",
+  "modelListMethod": "GET",
+  "modelListHeaders": {
+    "api-key": "{{api_key}}"
+  },
+  "modelListPathJsonPointer": "/data",
+  "chatCompletionEndpoint": "/openai/deployments/{{deployment_id}}/chat/completions",
+  "supportsStreaming": true,
+  "requestTransform": {
+    "type": "azure",
+    "mapping": {
+      "api_version": "2023-05-15"
+    }
+  },
+  "responseTransform": {
+    "type": "openai",
+    "mapping": {}
+  },
+  "rateLimitInfo": "Rate limits configured per deployment in Azure portal",
+  "notes": "Requires api-version query parameter and deployment-specific endpoints",
+  "lastVerified": "2024-01-15"
+}

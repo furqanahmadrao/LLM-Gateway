@@ -1,0 +1,32 @@
+{
+  "id": "cohere",
+  "displayName": "Cohere",
+  "authType": "api_key",
+  "authInstructions": "Enter your Cohere API key from https://dashboard.cohere.com/api-keys",
+  "baseUrl": "https://api.cohere.ai",
+  "modelListEndpoint": "/v1/models",
+  "modelListMethod": "GET",
+  "modelListHeaders": {
+    "Authorization": "Bearer {{api_key}}"
+  },
+  "modelListPathJsonPointer": "/models",
+  "chatCompletionEndpoint": "/v1/chat",
+  "supportsStreaming": true,
+  "requestTransform": {
+    "type": "cohere",
+    "mapping": {
+      "messages": "chat_history",
+      "max_tokens": "max_tokens",
+      "temperature": "temperature"
+    }
+  },
+  "responseTransform": {
+    "type": "cohere",
+    "mapping": {
+      "text": "choices[0].message.content"
+    }
+  },
+  "rateLimitInfo": "Rate limits vary by account tier",
+  "notes": "Requires request/response transformation from OpenAI format",
+  "lastVerified": "2024-01-15"
+}
