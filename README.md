@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![LLM Gateway Dashboard](https://via.placeholder.com/1200x600/0A0A0A/32FF89?text=LLM+Gateway+Dashboard)
+![LLM Gateway Dashboard](assets/dashboard.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-blue?logo=docker)](https://www.docker.com/)
