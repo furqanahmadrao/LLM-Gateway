@@ -5,6 +5,7 @@
 ![LLM Gateway Dashboard](assets/dashboard.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code of Conduct](https://img.shields.io/badge/Code%20of%20Conduct-Contributor%20Covenant-blue?logo=github)](CODE_OF_CONDUCT.md)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-blue?logo=docker)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14.0-black?logo=next.js)](https://nextjs.org/)
@@ -16,7 +17,6 @@
 
 </div>
 
----
 
 ## 🚀 Overview
 
@@ -141,6 +141,11 @@ graph TD
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
 
+Please also see our [Code of Conduct](CODE_OF_CONDUCT.md) and [Security Policy](SECURITY.md) for reporting vulnerabilities responsibly.
+
+Maintainer: [@furqanahmadrao](https://github.com/furqanahmadrao) • Contact: furqanrao091@gmail.com
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+[License File](LICENSE) • [Contributing Guide](CONTRIBUTING.md)
