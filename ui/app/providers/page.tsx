@@ -1,8 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ProviderModal from './ProviderModal';
 import { isDemoMode } from '../../lib/demoMode';
+
+// API Configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const ADMIN_API_KEY = process.env.NEXT_PUBLIC_ADMIN_KEY || '';
 
 // Provider status type
 type ProviderStatus = 'active' | 'error' | 'disabled';
@@ -17,37 +21,6 @@ interface ProviderConfig {
   lastError: string | null;
   modelCount: number;
 }
-
-// Mock data for demonstration (only used when DEMO_MODE is enabled)
-const mockProviders: ProviderConfig[] = [
-  {
-    id: '1',
-    providerId: 'openai',
-    displayName: 'OpenAI',
-    status: 'active',
-    lastSyncAt: new Date('2024-12-04T10:30:00'),
-    lastError: null,
-    modelCount: 12,
-  },
-  {
-    id: '2',
-    providerId: 'anthropic',
-    displayName: 'Anthropic',
-    status: 'active',
-    lastSyncAt: new Date('2024-12-04T09:15:00'),
-    lastError: null,
-    modelCount: 5,
-  },
-  {
-    id: '3',
-    providerId: 'azure',
-    displayName: 'Azure OpenAI',
-    status: 'error',
-    lastSyncAt: new Date('2024-12-03T14:00:00'),
-    lastError: 'Authentication failed: Invalid API key',
-    modelCount: 0,
-  },
-];
 
 function StatusBadge({ status }: { status: ProviderStatus }) {
   const styles = {
@@ -109,8 +82,9 @@ function SyncErrorAlert({ error, onRetry, isRetrying }: { error: string; onRetry
 }
 
 
-function formatLastSync(date: Date | null): string {
-  if (!date) return 'Never';
+function formatLastSync(dateStr: Date | string | null): string {
+  if (!dateStr) return 'Never';
+  const date = new Date(dateStr);
   
   const now = new Date();
   const diff = now.getTime() - date.getTime();
@@ -125,11 +99,34 @@ function formatLastSync(date: Date | null): string {
 }
 
 export default function ProvidersPage() {
-  // Use mock data only in demo mode, otherwise start with empty array
-  const [providers, setProviders] = useState<ProviderConfig[]>(isDemoMode() ? mockProviders : []);
+  const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<ProviderConfig | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  async function fetchProviders() {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/credentials`, {
+        headers: {
+          'Authorization': `Bearer ${ADMIN_API_KEY}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProviders(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch providers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchProviders();
+  }, []);
 
   const handleAddProvider = () => {
     setEditingProvider(null);
@@ -143,14 +140,21 @@ export default function ProvidersPage() {
 
   const handleSync = async (providerId: string) => {
     setSyncingId(providerId);
-    // Simulate sync - will be replaced with actual API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setProviders(prev => prev.map(p => 
-      p.id === providerId 
-        ? { ...p, lastSyncAt: new Date(), status: 'active' as ProviderStatus, lastError: null }
-        : p
-    ));
-    setSyncingId(null);
+    try {
+      const res = await fetch(`${API_URL}/api/providers/${providerId}/refresh-models`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ADMIN_API_KEY}`
+        }
+      });
+      if (res.ok) {
+        await fetchProviders();
+      }
+    } catch (error) {
+      console.error('Failed to sync provider:', error);
+    } finally {
+      setSyncingId(null);
+    }
   };
 
   const handleModalClose = () => {
@@ -158,27 +162,30 @@ export default function ProvidersPage() {
     setEditingProvider(null);
   };
 
-  const handleSaveProvider = (providerId: string, credentials: Record<string, string>) => {
-    // Will be replaced with actual API call
-    if (editingProvider) {
-      setProviders(prev => prev.map(p =>
-        p.id === editingProvider.id
-          ? { ...p, status: 'active' as ProviderStatus, lastSyncAt: new Date() }
-          : p
-      ));
-    } else {
-      const newProvider: ProviderConfig = {
-        id: Date.now().toString(),
-        providerId,
-        displayName: providerId.charAt(0).toUpperCase() + providerId.slice(1),
-        status: 'active',
-        lastSyncAt: new Date(),
-        lastError: null,
-        modelCount: 0,
-      };
-      setProviders(prev => [...prev, newProvider]);
+  const handleSaveProvider = async (providerId: string, credentials: Record<string, string>) => {
+    try {
+      const res = await fetch(`${API_URL}/api/credentials`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${ADMIN_API_KEY}`
+        },
+        body: JSON.stringify({
+          providerId,
+          credentials
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save credentials');
+      }
+
+      await fetchProviders();
+      handleModalClose();
+    } catch (error) {
+      console.error('Error saving provider:', error);
+      alert('Failed to save provider. Please try again.');
     }
-    handleModalClose();
   };
 
   return (
@@ -205,7 +212,13 @@ export default function ProvidersPage() {
             </tr>
           </thead>
           <tbody>
-            {providers.map((provider) => (
+            {isLoading && providers.length === 0 ? (
+               <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
+                  Loading providers...
+                </td>
+              </tr>
+            ) : providers.map((provider) => (
               <>
                 <tr key={provider.id} className="border-b border-border-subtle last:border-b-0 hover:bg-[rgba(255,255,255,0.02)] transition-colors">
                   <td className="px-4 py-3">
@@ -237,8 +250,8 @@ export default function ProvidersPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => handleSync(provider.id)}
-                        disabled={syncingId === provider.id}
+                        onClick={() => handleSync(provider.providerId)}
+                        disabled={syncingId === provider.providerId}
                         className={`p-2 rounded-button transition-colors disabled:opacity-50 ${
                           provider.status === 'error' 
                             ? 'text-status-error hover:text-status-error hover:bg-status-error/10' 
@@ -247,7 +260,7 @@ export default function ProvidersPage() {
                         title={provider.status === 'error' ? 'Retry sync' : 'Sync models'}
                       >
                         <svg 
-                          className={`w-4 h-4 ${syncingId === provider.id ? 'animate-spin' : ''}`} 
+                          className={`w-4 h-4 ${syncingId === provider.providerId ? 'animate-spin' : ''}`}
                           fill="none" 
                           stroke="currentColor" 
                           viewBox="0 0 24 24"
@@ -273,15 +286,15 @@ export default function ProvidersPage() {
                     <td colSpan={5} className="px-4 py-2">
                       <SyncErrorAlert 
                         error={provider.lastError} 
-                        onRetry={() => handleSync(provider.id)}
-                        isRetrying={syncingId === provider.id}
+                        onRetry={() => handleSync(provider.providerId)}
+                        isRetrying={syncingId === provider.providerId}
                       />
                     </td>
                   </tr>
                 )}
               </>
             ))}
-            {providers.length === 0 && (
+            {!isLoading && providers.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
                   No providers configured. Click "Add Provider" to get started.

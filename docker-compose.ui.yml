@@ -13,6 +13,7 @@ services:
       # If the UI calls the backend from the browser, it needs the public URL.
       # Since we map backend to 3000 on host, we point to localhost:3000
       - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - NEXT_PUBLIC_ADMIN_KEY=llmgw_admin_secret_key
     restart: unless-stopped
     networks:
       - gateway-network

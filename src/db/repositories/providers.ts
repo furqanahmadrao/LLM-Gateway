@@ -35,6 +35,16 @@ interface ProviderRow {
   created_at: Date;
 }
 
+export interface ProviderRow {
+  id: string;
+  provider_id: string;
+  display_name: string;
+  template: object;
+  is_custom: boolean;
+  custom_config: any;
+  created_at: Date;
+}
+
 function rowToProviderCredential(row: ProviderCredentialRow): ProviderCredential {
   return {
     id: row.id,
@@ -55,6 +65,36 @@ function rowToProviderCredential(row: ProviderCredentialRow): ProviderCredential
 export async function getProviderByStringId(providerStringId: string): Promise<ProviderRow | null> {
   const result = await query<ProviderRow>('SELECT * FROM providers WHERE provider_id = $1', [providerStringId]);
   if (result.rows.length === 0) return null;
+  return result.rows[0];
+}
+
+export async function getAllProviders(): Promise<ProviderRow[]> {
+  const result = await query<ProviderRow>('SELECT * FROM providers ORDER BY display_name ASC');
+  return result.rows;
+}
+
+export async function createCustomProvider(
+  providerId: string,
+  displayName: string,
+  customConfig: any
+): Promise<ProviderRow> {
+  const template = {
+    id: providerId,
+    displayName,
+    authType: 'api_key',
+    authInstructions: 'Enter your API key',
+    baseUrl: customConfig.baseUrl,
+    modelListEndpoint: customConfig.modelsPath || '/v1/models',
+    chatCompletionEndpoint: customConfig.chatCompletionsPath || '/v1/chat/completions',
+  };
+
+  const result = await query<ProviderRow>(
+    `INSERT INTO providers
+     (provider_id, display_name, template, is_custom, custom_config)
+     VALUES ($1, $2, $3, true, $4)
+     RETURNING *`,
+    [providerId, displayName, JSON.stringify(template), JSON.stringify(customConfig)]
+  );
   return result.rows[0];
 }
 

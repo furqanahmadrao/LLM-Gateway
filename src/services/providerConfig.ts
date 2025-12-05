@@ -14,6 +14,7 @@ import {
   updateProviderCredentialSyncTime,
   deleteProviderWithCascade,
   getProviderByStringId,
+  getAllProviders,
 } from '../db/repositories/providers.js';
 import { createModel, deleteModelsByProviderId, getModelsByProviderId } from '../db/repositories/models.js';
 import {
@@ -21,9 +22,32 @@ import {
   invalidateTeamModelCache,
   onCredentialDelete,
 } from './modelCache.js';
-import { getAdapterForProvider } from '../adapters/index.js';
+import { getAdapterForProvider, registerCustomAdapter } from '../adapters/index.js';
 import type { ProviderCredentialInput, ProviderCredential } from '../types/providers.js';
 import type { UnifiedModel } from '../types/models.js';
+
+/**
+ * Initialize all custom providers from database
+ */
+export async function initializeCustomProviders(): Promise<void> {
+  try {
+    const providers = await getAllProviders();
+    const customProviders = providers.filter(p => p.is_custom);
+
+    for (const provider of customProviders) {
+      if (provider.custom_config) {
+        registerCustomAdapter(
+          provider.provider_id,
+          provider.display_name,
+          provider.custom_config
+        );
+      }
+    }
+    console.log(`Initialized ${customProviders.length} custom providers`);
+  } catch (error) {
+    console.error('Failed to initialize custom providers:', error);
+  }
+}
 
 export interface SaveCredentialsResult {
   credential: ProviderCredential;

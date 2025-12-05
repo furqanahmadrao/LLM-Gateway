@@ -6,10 +6,15 @@
  */
 
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { query, closePool } from './pool.js';
 import { getAllTemplates } from '../providers/templates/index.js';
 
 dotenv.config();
+
+function hashApiKey(key: string): string {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
 
 async function seedProviders(): Promise<void> {
   console.log('=== Seeding Provider Templates ===');
@@ -51,9 +56,76 @@ async function seedProviders(): Promise<void> {
   console.log(`=== Seeded ${templates.length} provider templates ===`);
 }
 
+async function seedDefaultData(): Promise<void> {
+  console.log('=== Seeding Default Data ===');
+
+  try {
+    // 1. Create Default Team
+    let teamId: string;
+    const teamResult = await query<{ id: string }>('SELECT id FROM teams WHERE name = $1', ['Default Team']);
+
+    if (teamResult.rows.length > 0) {
+      teamId = teamResult.rows[0].id;
+      console.log('Default Team already exists');
+    } else {
+      const newTeam = await query<{ id: string }>(
+        'INSERT INTO teams (name) VALUES ($1) RETURNING id',
+        ['Default Team']
+      );
+      teamId = newTeam.rows[0].id;
+      console.log('Created Default Team');
+    }
+
+    // 2. Create Default Project
+    let projectId: string;
+    const projectResult = await query<{ id: string }>(
+      'SELECT id FROM projects WHERE team_id = $1 AND name = $2',
+      [teamId, 'Default Project']
+    );
+
+    if (projectResult.rows.length > 0) {
+      projectId = projectResult.rows[0].id;
+      console.log('Default Project already exists');
+    } else {
+      const newProject = await query<{ id: string }>(
+        'INSERT INTO projects (team_id, name) VALUES ($1, $2) RETURNING id',
+        [teamId, 'Default Project']
+      );
+      projectId = newProject.rows[0].id;
+      console.log('Created Default Project');
+    }
+
+    // 3. Create Default Admin API Key
+    const apiKey = 'llmgw_admin_secret_key';
+    const keyHash = hashApiKey(apiKey);
+    const keyPrefix = apiKey.slice(0, 8);
+
+    const keyResult = await query(
+      'SELECT id FROM api_keys WHERE key_hash = $1',
+      [keyHash]
+    );
+
+    if (keyResult.rows.length > 0) {
+      console.log('Default Admin API Key already exists');
+    } else {
+      await query(
+        `INSERT INTO api_keys (key_hash, key_prefix, project_id, name)
+         VALUES ($1, $2, $3, $4)`,
+        [keyHash, keyPrefix, projectId, 'Default Admin Key']
+      );
+      console.log('Created Default Admin API Key: llmgw_admin_secret_key');
+    }
+
+  } catch (error) {
+    console.error('Failed to seed default data:', error);
+    throw error;
+  }
+}
+
 async function main(): Promise<void> {
   try {
     await seedProviders();
+    await seedDefaultData();
     console.log('Seeding completed successfully');
   } catch (error) {
     console.error('Seeding failed:', error);

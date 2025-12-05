@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import routes from './api/routes.js';
 import { loggingMiddleware, hostValidationMiddleware } from './middleware/index.js';
 import { initializeBaseUrl, getBaseUrlConfig } from './services/baseUrl.js';
+import { initializeCustomProviders } from './services/providerConfig.js';
 
 dotenv.config();
 
@@ -17,6 +18,11 @@ try {
   console.error('Failed to initialize BASE_URL:', error);
   process.exit(1);
 }
+
+// Initialize custom providers
+initializeCustomProviders().catch(err => {
+  console.error('Failed to initialize custom providers:', err);
+});
 
 // Middleware
 app.use(express.json());
