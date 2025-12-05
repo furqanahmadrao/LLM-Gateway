@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - DEMO_MODE=${DEMO_MODE:-true}
+      # If the UI calls the backend from the browser, it needs the public URL.
+      # Since we map backend to 3000 on host, we point to localhost:3000
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    restart: unless-stopped
+    networks:
+      - gateway-network
+
+networks:
+  gateway-network:
+    driver: bridge

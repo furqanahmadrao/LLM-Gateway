@@ -6,8 +6,8 @@
  * Requirements: 16.4
  */
 
-import { pool } from '../db/pool.js';
-import { redis } from '../db/redis.js';
+import pool from '../db/pool.js';
+import redis from '../db/redis.js';
 
 /**
  * Health status for a component

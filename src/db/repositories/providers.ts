@@ -16,8 +16,11 @@ interface ProviderCredentialRow {
   id: string;
   provider_id: string;
   team_id: string;
+  credential_name: string;
   credentials_encrypted: Buffer;
   status: string;
+  is_default: boolean;
+  priority: number;
   last_sync_at: Date | null;
   last_error: string | null;
   created_at: Date;
@@ -37,8 +40,11 @@ function rowToProviderCredential(row: ProviderCredentialRow): ProviderCredential
     id: row.id,
     providerId: row.provider_id,
     teamId: row.team_id,
+    credentialName: row.credential_name,
     credentialsEncrypted: row.credentials_encrypted.toString('base64'),
     status: row.status as 'active' | 'error' | 'disabled',
+    isDefault: row.is_default,
+    priority: row.priority,
     lastSyncAt: row.last_sync_at,
     lastError: row.last_error,
     createdAt: row.created_at,
@@ -58,33 +64,62 @@ export async function getProviderById(id: string): Promise<ProviderRow | null> {
   return result.rows[0];
 }
 
+export async function getProviderCredentialByTeamProviderAndName(teamId: string, providerUuid: string, credentialName: string): Promise<ProviderCredential | null> {
+  const result = await query<ProviderCredentialRow>(
+    'SELECT * FROM provider_credentials WHERE team_id = $1 AND provider_id = $2 AND credential_name = $3',
+    [teamId, providerUuid, credentialName]
+  );
+  if (result.rows.length === 0) return null;
+  return rowToProviderCredential(result.rows[0]);
+}
+
 export async function saveProviderCredentials(input: ProviderCredentialInput): Promise<ProviderCredential> {
   const provider = await getProviderByStringId(input.providerId);
   if (!provider) throw new Error(`Provider not found: ${input.providerId}`);
+  
   const credentialsJson = JSON.stringify(input.credentials);
   const encryptedCredentials = encrypt(credentialsJson);
   const encryptedBuffer = Buffer.from(encryptedCredentials, 'base64');
-  const existing = await getProviderCredentialsByTeamAndProvider(input.teamId, provider.id);
+  
+  const credentialName = input.credentialName;
+  const isDefault = input.isDefault ?? false;
+  const priority = input.priority ?? 0;
+
+  const existing = await getProviderCredentialByTeamProviderAndName(input.teamId, provider.id, credentialName);
+  
   if (existing) {
     const result = await query<ProviderCredentialRow>(
-      `UPDATE provider_credentials SET credentials_encrypted = $1, status = 'active', last_error = NULL, updated_at = NOW() WHERE id = $2 RETURNING *`,
-      [encryptedBuffer, existing.id]
+      `UPDATE provider_credentials 
+       SET credentials_encrypted = $1, status = 'active', last_error = NULL, 
+           is_default = $2, priority = $3, updated_at = NOW() 
+       WHERE id = $4 RETURNING *`,
+      [encryptedBuffer, isDefault, priority, existing.id]
     );
     return rowToProviderCredential(result.rows[0]);
   } else {
     const id = uuidv4();
     const result = await query<ProviderCredentialRow>(
-      `INSERT INTO provider_credentials (id, provider_id, team_id, credentials_encrypted, status) VALUES ($1, $2, $3, $4, 'active') RETURNING *`,
-      [id, provider.id, input.teamId, encryptedBuffer]
+      `INSERT INTO provider_credentials 
+       (id, provider_id, team_id, credential_name, credentials_encrypted, status, is_default, priority) 
+       VALUES ($1, $2, $3, $4, $5, 'active', $6, $7) RETURNING *`,
+      [id, provider.id, input.teamId, credentialName, encryptedBuffer, isDefault, priority]
     );
     return rowToProviderCredential(result.rows[0]);
   }
 }
 
 export async function getProviderCredentialsByTeamAndProvider(teamId: string, providerUuid: string): Promise<ProviderCredential | null> {
-  const result = await query<ProviderCredentialRow>('SELECT * FROM provider_credentials WHERE team_id = $1 AND provider_id = $2', [teamId, providerUuid]);
+  // Return the default one, or the one with highest priority (lowest number)
+  const result = await query<ProviderCredentialRow>(
+    'SELECT * FROM provider_credentials WHERE team_id = $1 AND provider_id = $2 ORDER BY is_default DESC, priority ASC LIMIT 1', 
+    [teamId, providerUuid]
+  );
   if (result.rows.length === 0) return null;
   return rowToProviderCredential(result.rows[0]);
+}
+
+export async function getDefaultCredential(teamId: string, providerUuid: string): Promise<ProviderCredential | null> {
+  return getProviderCredentialsByTeamAndProvider(teamId, providerUuid);
 }
 
 export async function getProviderCredentialsByTeamAndProviderStringId(teamId: string, providerStringId: string): Promise<ProviderCredential | null> {
@@ -107,8 +142,11 @@ export async function getDecryptedCredentials(teamId: string, providerStringId: 
     id: credential.id,
     providerId: credential.providerId,
     teamId: credential.teamId,
+    credentialName: credential.credentialName,
     credentials,
     status: credential.status,
+    isDefault: credential.isDefault,
+    priority: credential.priority,
     lastSyncAt: credential.lastSyncAt,
     lastError: credential.lastError,
     createdAt: credential.createdAt,
@@ -150,8 +188,21 @@ export async function getProviderStatus(teamId: string, providerStringId: string
 }
 
 export async function getAllProviderStatuses(teamId: string): Promise<ProviderStatus[]> {
-  const result = await query<ProviderCredentialRow & { provider_string_id: string }>(`SELECT pc.*, p.provider_id as provider_string_id FROM provider_credentials pc JOIN providers p ON pc.provider_id = p.id WHERE pc.team_id = $1`, [teamId]);
-  return result.rows.map(row => ({ providerId: row.provider_string_id, teamId: row.team_id, status: row.status as 'active' | 'error' | 'disabled', lastSyncAt: row.last_sync_at, lastError: row.last_error }));
+  const result = await query<ProviderCredentialRow & { provider_string_id: string }>(
+    `SELECT pc.*, p.provider_id as provider_string_id 
+     FROM provider_credentials pc 
+     JOIN providers p ON pc.provider_id = p.id 
+     WHERE pc.team_id = $1
+     ORDER BY pc.priority ASC`, 
+    [teamId]
+  );
+  return result.rows.map(row => ({ 
+    providerId: row.provider_string_id, 
+    teamId: row.team_id, 
+    status: row.status as 'active' | 'error' | 'disabled', 
+    lastSyncAt: row.last_sync_at, 
+    lastError: row.last_error 
+  }));
 }
 
 export async function hasProviderCredentials(teamId: string, providerStringId: string): Promise<boolean> {
