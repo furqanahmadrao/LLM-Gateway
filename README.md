@@ -5,7 +5,6 @@
 ![LLM Gateway Dashboard](assets/dashboard.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code of Conduct](https://img.shields.io/badge/Code%20of%20Conduct-Contributor%20Covenant-blue?logo=github)](CODE_OF_CONDUCT.md)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-blue?logo=docker)](https://www.docker.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14.0-black?logo=next.js)](https://nextjs.org/)
@@ -13,7 +12,7 @@
 
 **An enterprise-grade, unified API gateway for managing, routing, and monitoring Large Language Model (LLM) traffic.**
 
-[Features](#key-features) • [Getting Started](#getting-started) • [Architecture](#architecture) • [API Reference](#api-reference) • [Contributing](#contributing)
+[Features](#key-features) • [Getting Started](#getting-started) • [Architecture](#architecture) • [Contributing](#contributing)
 
 </div>
 
@@ -24,7 +23,7 @@ LLM Gateway is a self-hosted intermediary service that sits between your applica
 
 Stop managing scattered API keys and complex routing logic in your client apps. Centralize your AI infrastructure with LLM Gateway.
 
-## ✨ Key Features
+## ✨ Key Features {#key-features}
 
 *   **🔌 Unified Interface**: Drop-in replacement for the OpenAI SDK. Switch providers without changing client code.
 *   **⚖️ Smart Routing**:
@@ -51,7 +50,7 @@ Stop managing scattered API keys and complex routing logic in your client apps. 
 *   **Cache/Queue**: Redis (Caching & Rate limiting)
 *   **Infrastructure**: Docker & Docker Compose
 
-## 🚀 Getting Started
+## 🚀 Getting Started {#getting-started}
 
 ### Prerequisites
 
@@ -121,10 +120,10 @@ curl http://localhost:3000/v1/chat/completions \
   -d '{
     "model": "openai:gpt-3.5-turbo",
     "messages": [{"role": "user", "content": "Say hello!"}]
-  }'
+}'
 ```
 
-## 🏗️ Architecture
+## 🏗️ Architecture {#architecture}
 
 ```mermaid
 graph TD
@@ -137,11 +136,11 @@ graph TD
     UI[Next.js Dashboard] -->|Manage| Gateway
 ```
 
-## 🤝 Contributing
+## 🤝 Contributing {#contributing}
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
 
-Please also see our [Code of Conduct](CODE_OF_CONDUCT.md) and [Security Policy](SECURITY.md) for reporting vulnerabilities responsibly.
+## 👤 Maintainer
 
 Maintainer: [@furqanahmadrao](https://github.com/furqanahmadrao) • Contact: furqanrao091@gmail.com
 
