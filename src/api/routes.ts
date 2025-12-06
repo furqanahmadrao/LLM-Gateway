@@ -14,9 +14,13 @@ import { checkRateLimit } from '../services/rateLimiter.js';
 import { incrementRequestCount, recordLatency, recordTokenUsage } from '../services/realMetrics.js';
 import { extractUsageFromResponse, estimateUsage } from '../services/usage.js';
 import { recordRequest } from '../services/metrics.js';
+import providerRoutes from './providers.js';
 import type { ChatCompletionRequest, ChatCompletionResponse, ChatCompletionChunk, ErrorResponse } from '../types/chat.js';
 
 const router: IRouter = Router();
+
+// Mount provider management routes
+router.use(providerRoutes);
 
 /**
  * Create an error response in OpenAI format

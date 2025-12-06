@@ -2,84 +2,26 @@
 
 import { useState, useEffect } from 'react';
 
-// Provider template interface matching the backend
+// API Configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const ADMIN_API_KEY = process.env.NEXT_PUBLIC_ADMIN_KEY || '';
+
 interface ProviderTemplate {
   id: string;
   displayName: string;
   authType: 'api_key' | 'oauth' | 'aws_sigv4' | 'none';
   authInstructions: string;
   baseUrl: string;
+  isCustom?: boolean;
+  customConfig?: any;
 }
 
-// Available provider templates - matches backend templates
-const providerTemplates: ProviderTemplate[] = [
-  {
-    id: 'openai',
-    displayName: 'OpenAI',
-    authType: 'api_key',
-    authInstructions: 'Enter your OpenAI API key from https://platform.openai.com/api-keys',
-    baseUrl: 'https://api.openai.com',
-  },
-  {
-    id: 'anthropic',
-    displayName: 'Anthropic',
-    authType: 'api_key',
-    authInstructions: 'Enter your Anthropic API key from https://console.anthropic.com/settings/keys',
-    baseUrl: 'https://api.anthropic.com',
-  },
-  {
-    id: 'azure',
-    displayName: 'Azure OpenAI',
-    authType: 'api_key',
-    authInstructions: 'Enter your Azure OpenAI API key and configure your resource endpoint',
-    baseUrl: 'https://{{resource_name}}.openai.azure.com',
-  },
-  {
-    id: 'mistral',
-    displayName: 'Mistral AI',
-    authType: 'api_key',
-    authInstructions: 'Enter your Mistral API key from https://console.mistral.ai/api-keys',
-    baseUrl: 'https://api.mistral.ai',
-  },
-  {
-    id: 'groq',
-    displayName: 'Groq',
-    authType: 'api_key',
-    authInstructions: 'Enter your Groq API key from https://console.groq.com/keys',
-    baseUrl: 'https://api.groq.com/openai',
-  },
-  {
-    id: 'cohere',
-    displayName: 'Cohere',
-    authType: 'api_key',
-    authInstructions: 'Enter your Cohere API key from https://dashboard.cohere.com/api-keys',
-    baseUrl: 'https://api.cohere.ai',
-  },
-];
-
-
-// Credential field configuration based on provider
 interface CredentialField {
   name: string;
   label: string;
   type: 'text' | 'password';
   placeholder: string;
   required: boolean;
-}
-
-function getCredentialFields(providerId: string): CredentialField[] {
-  switch (providerId) {
-    case 'azure':
-      return [
-        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'Enter your Azure OpenAI API key', required: true },
-        { name: 'resource_name', label: 'Resource Name', type: 'text', placeholder: 'your-resource-name', required: true },
-        { name: 'deployment_id', label: 'Default Deployment ID', type: 'text', placeholder: 'gpt-4', required: false },
-      ];
-    default:
-      return [
-        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'Enter your API key', required: true },
-      ];
-  }
 }
 
 interface ProviderConfig {
@@ -100,21 +42,56 @@ interface ProviderModalProps {
 }
 
 export default function ProviderModal({ isOpen, onClose, onSave, editingProvider }: ProviderModalProps) {
+  const [templates, setTemplates] = useState<ProviderTemplate[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [customConfig, setCustomConfig] = useState({
+    providerId: '',
+    displayName: '',
+    baseUrl: '',
+    modelsPath: '/v1/models',
+    chatCompletionsPath: '/v1/chat/completions'
+  });
 
-  // Reset form when modal opens/closes or editing provider changes
+  // Fetch templates on mount
+  useEffect(() => {
+    async function fetchTemplates() {
+      try {
+        const res = await fetch(`${API_URL}/api/providers`, {
+          headers: {
+            'Authorization': `Bearer ${ADMIN_API_KEY}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTemplates(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch provider templates:', error);
+      }
+    }
+    if (isOpen) {
+      fetchTemplates();
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       if (editingProvider) {
         setSelectedProvider(editingProvider.providerId);
-        // When editing, credentials are masked - user must re-enter
         setCredentials({});
       } else {
         setSelectedProvider('');
         setCredentials({});
+        setCustomConfig({
+          providerId: '',
+          displayName: '',
+          baseUrl: '',
+          modelsPath: '/v1/models',
+          chatCompletionsPath: '/v1/chat/completions'
+        });
       }
       setShowCredentials({});
     }
@@ -138,52 +115,94 @@ export default function ProviderModal({ isOpen, onClose, onSave, editingProvider
     e.preventDefault();
     setIsSaving(true);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    onSave(selectedProvider, credentials);
-    setIsSaving(false);
+    try {
+      if (selectedProvider === 'custom') {
+        // Create custom provider first
+        const createRes = await fetch(`${API_URL}/api/providers`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${ADMIN_API_KEY}`
+          },
+          body: JSON.stringify({
+            providerId: customConfig.providerId,
+            displayName: customConfig.displayName,
+            customConfig: {
+              baseUrl: customConfig.baseUrl,
+              modelsPath: customConfig.modelsPath,
+              chatCompletionsPath: customConfig.chatCompletionsPath
+            }
+          })
+        });
+
+        if (!createRes.ok) {
+          throw new Error('Failed to create custom provider');
+        }
+
+        // Use the new provider ID
+        await onSave(customConfig.providerId, credentials);
+      } else {
+        await onSave(selectedProvider, credentials);
+      }
+    } catch (error) {
+      console.error('Error saving provider:', error);
+      alert('Failed to save provider. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const selectedTemplate = providerTemplates.find(t => t.id === selectedProvider);
-  const credentialFields = selectedProvider ? getCredentialFields(selectedProvider) : [];
+  const selectedTemplate = templates.find(t => t.id === selectedProvider);
 
-  // Check if form is valid
-  const isFormValid = selectedProvider && credentialFields
-    .filter(f => f.required)
-    .every(f => credentials[f.name]?.trim());
+  const getCredentialFields = (providerId: string): CredentialField[] => {
+    if (providerId === 'azure') {
+      return [
+        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'Enter your Azure OpenAI API key', required: true },
+        { name: 'resource_name', label: 'Resource Name', type: 'text', placeholder: 'your-resource-name', required: true },
+        { name: 'deployment_id', label: 'Default Deployment ID', type: 'text', placeholder: 'gpt-4', required: false },
+      ];
+    }
+    return [
+      { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'Enter your API key', required: true },
+    ];
+  };
+
+  const credentialFields = (selectedProvider && selectedProvider !== 'custom')
+    ? getCredentialFields(selectedProvider)
+    : (selectedProvider === 'custom' ? [{ name: 'api_key', label: 'API Key', type: 'password', placeholder: 'Enter API Key', required: true }] : []);
+
+  const isFormValid = (() => {
+    if (selectedProvider === 'custom') {
+      return customConfig.providerId && customConfig.displayName && customConfig.baseUrl && credentials['api_key'];
+    }
+    return selectedProvider && credentialFields
+      .filter(f => f.required)
+      .every(f => credentials[f.name]?.trim());
+  })();
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
       
-      {/* Modal */}
-      <div className="relative bg-panel border border-border rounded-[12px] shadow-xl w-full max-w-md mx-4">
-        {/* Header */}
+      <div className="relative bg-panel border border-border rounded-[12px] shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="text-base font-semibold text-text-primary">
             {editingProvider ? 'Edit Provider' : 'Add Provider'}
           </h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-text-muted hover:text-white transition-colors"
-          >
+          <button onClick={onClose} className="p-1 text-text-muted hover:text-white transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Body */}
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 space-y-4">
-            {/* Provider Selection */}
             {!editingProvider && (
               <div>
                 <label className="block text-label uppercase text-text-muted font-medium tracking-wide mb-2">Provider</label>
@@ -193,23 +212,57 @@ export default function ProviderModal({ isOpen, onClose, onSave, editingProvider
                   className="w-full bg-background border border-border rounded-button px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent transition-colors"
                 >
                   <option value="">Select a provider...</option>
-                  {providerTemplates.map(template => (
-                    <option key={template.id} value={template.id}>
-                      {template.displayName}
-                    </option>
+                  {templates.map(template => (
+                    <option key={template.id} value={template.id}>{template.displayName}</option>
                   ))}
+                  <option value="custom">+ Custom Provider</option>
                 </select>
               </div>
             )}
 
-            {/* Provider Info */}
+            {/* Custom Provider Configuration */}
+            {selectedProvider === 'custom' && (
+              <div className="space-y-4 border-t border-b border-border py-4 my-2">
+                <h3 className="text-sm font-medium text-text-primary">Custom Provider Details</h3>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Provider ID (e.g., my-llm)</label>
+                  <input
+                    type="text"
+                    value={customConfig.providerId}
+                    onChange={(e) => setCustomConfig({...customConfig, providerId: e.target.value})}
+                    className="w-full bg-background border border-border rounded-button px-3 py-2 text-sm text-text-primary"
+                    placeholder="unique-id"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Display Name</label>
+                  <input
+                    type="text"
+                    value={customConfig.displayName}
+                    onChange={(e) => setCustomConfig({...customConfig, displayName: e.target.value})}
+                    className="w-full bg-background border border-border rounded-button px-3 py-2 text-sm text-text-primary"
+                    placeholder="My Custom LLM"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Base URL</label>
+                  <input
+                    type="text"
+                    value={customConfig.baseUrl}
+                    onChange={(e) => setCustomConfig({...customConfig, baseUrl: e.target.value})}
+                    className="w-full bg-background border border-border rounded-button px-3 py-2 text-sm text-text-primary"
+                    placeholder="https://api.example.com"
+                  />
+                </div>
+              </div>
+            )}
+
             {selectedTemplate && (
               <div className="bg-background/50 rounded-button p-3 text-sm">
                 <p className="text-text-muted">{selectedTemplate.authInstructions}</p>
               </div>
             )}
 
-            {/* Credential Fields */}
             {credentialFields.map(field => (
               <div key={field.name}>
                 <label className="block text-label uppercase text-text-muted font-medium tracking-wide mb-2">
@@ -246,7 +299,6 @@ export default function ProviderModal({ isOpen, onClose, onSave, editingProvider
               </div>
             ))}
 
-            {/* Edit mode notice */}
             {editingProvider && (
               <p className="text-xs text-text-muted">
                 Leave credential fields empty to keep existing values.
@@ -254,7 +306,6 @@ export default function ProviderModal({ isOpen, onClose, onSave, editingProvider
             )}
           </div>
 
-          {/* Footer */}
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
             <button
               type="button"
@@ -265,7 +316,7 @@ export default function ProviderModal({ isOpen, onClose, onSave, editingProvider
             </button>
             <button
               type="submit"
-              disabled={!editingProvider && !isFormValid || isSaving}
+              disabled={(!editingProvider && !isFormValid) || isSaving}
               className="px-4 py-2 bg-accent hover:bg-accent-hover text-[#0A0A0A] rounded-button text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : editingProvider ? 'Update' : 'Add Provider'}
