@@ -1,6 +1,9 @@
 {
   "name": "llm-gateway",
   "version": "1.0.0",
+  "workspaces": [
+    "ui"
+  ],
   "description": "Unified OpenAI-compatible API gateway for multiple AI providers",
   "type": "module",
   "main": "dist/index.js",
