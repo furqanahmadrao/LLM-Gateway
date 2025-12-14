@@ -8,6 +8,7 @@
  */
 
 import { Router, Request, Response, IRouter } from 'express';
+import cookieParser from 'cookie-parser';
 import { authMiddleware } from '../middleware/auth.js';
 import { resolveModelForRouting, ModelResolutionError } from '../services/router.js';
 import { checkRateLimit } from '../services/rateLimiter.js';
@@ -15,12 +16,20 @@ import { incrementRequestCount, recordLatency, recordTokenUsage } from '../servi
 import { extractUsageFromResponse, estimateUsage } from '../services/usage.js';
 import { recordRequest } from '../services/metrics.js';
 import providerRoutes from './providers.js';
+import authRoutes from './auth.js';
+import modelRoutes from './models.js';
+import organizationRoutes from './organizations.js'; // Import org routes
 import type { ChatCompletionRequest, ChatCompletionResponse, ChatCompletionChunk, ErrorResponse } from '../types/chat.js';
 
 const router: IRouter = Router();
 
-// Mount provider management routes
+router.use(cookieParser());
+router.use('/auth', authRoutes);
+
+// Mount routes
 router.use(providerRoutes);
+router.use('/api', modelRoutes);
+router.use(organizationRoutes); // Mount org routes (paths already include /api)
 
 /**
  * Create an error response in OpenAI format
@@ -1105,6 +1114,47 @@ router.get('/api/dashboard/metrics/timeseries', authMiddleware, async (req: Requ
       'Failed to fetch metrics time series',
       'internal_error',
       'timeseries_fetch_error'
+    ));
+  }
+});
+
+/**
+ * GET /api/usage/logs
+ * 
+ * Returns raw usage logs with optional filtering.
+ * 
+ * Requirements: 7.1 - Display real usage data
+ */
+router.get('/api/usage/logs', authMiddleware, async (req: Request, res: Response) => {
+  const teamId = req.auth!.teamId;
+  
+  try {
+    const { getUsageLogs } = await import('../services/usage.js');
+    
+    // Parse query params
+    const projectId = req.query.projectId as string;
+    const providerId = req.query.providerId as string;
+    const modelId = req.query.modelId as string;
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    
+    // TODO: Verify projectId belongs to teamId for security
+    
+    const logs = await getUsageLogs({
+      projectId,
+      providerId,
+      modelId,
+      startDate,
+      endDate
+    });
+    
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching usage logs:', error);
+    res.status(500).json(createErrorResponse(
+      'Failed to fetch usage logs',
+      'internal_error',
+      'usage_logs_error'
     ));
   }
 });

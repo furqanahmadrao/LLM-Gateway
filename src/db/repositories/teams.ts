@@ -36,11 +36,11 @@ interface TeamMemberRow {
  * 
  * Requirements: 8.1 - Initialize isolated namespace for projects and credentials
  */
-export async function createTeam(name: string): Promise<Team> {
+export async function createTeam(name: string, organizationId?: string): Promise<Team> {
   const id = uuidv4();
   const result = await query<TeamRow>(
-    'INSERT INTO teams (id, name) VALUES ($1, $2) RETURNING *',
-    [id, name]
+    'INSERT INTO teams (id, name, organization_id) VALUES ($1, $2, $3) RETURNING *',
+    [id, name, organizationId || null]
   );
   const row = result.rows[0];
   return {

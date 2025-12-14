@@ -9,8 +9,11 @@ import type {
   ProviderCredential, 
   ProviderCredentialInput, 
   ProviderCredentialWithDecrypted,
-  ProviderStatus 
+  ProviderStatus,
+  Provider, // Import Provider
+  CustomProviderConfig, // Import CustomProviderConfig
 } from '../../types/providers.js';
+import type { ProviderTemplate } from '../../types/index.js';
 
 interface ProviderCredentialRow {
   id: string;
@@ -27,21 +30,14 @@ interface ProviderCredentialRow {
   updated_at: Date;
 }
 
+// Internal representation for DB rows, matching the 'Provider' interface from types/providers.ts
 interface ProviderRow {
   id: string;
   provider_id: string;
   display_name: string;
-  template: object;
-  created_at: Date;
-}
-
-export interface ProviderRow {
-  id: string;
-  provider_id: string;
-  display_name: string;
-  template: object;
+  template: ProviderTemplate | CustomProviderConfig; // Use specific types
   is_custom: boolean;
-  custom_config: any;
+  custom_config: CustomProviderConfig | null; // Use specific type
   created_at: Date;
 }
 
@@ -62,30 +58,46 @@ function rowToProviderCredential(row: ProviderCredentialRow): ProviderCredential
   };
 }
 
-export async function getProviderByStringId(providerStringId: string): Promise<ProviderRow | null> {
-  const result = await query<ProviderRow>('SELECT * FROM providers WHERE provider_id = $1', [providerStringId]);
-  if (result.rows.length === 0) return null;
-  return result.rows[0];
+function rowToProvider(row: ProviderRow): Provider {
+  return {
+    id: row.id,
+    provider_id: row.provider_id,
+    display_name: row.display_name,
+    template: row.template as ProviderTemplate, // Cast back to ProviderTemplate
+    is_custom: row.is_custom,
+    custom_config: row.custom_config,
+    created_at: row.created_at,
+  };
 }
 
-export async function getAllProviders(): Promise<ProviderRow[]> {
+export async function getProviderByStringId(providerStringId: string): Promise<Provider | null> {
+  const result = await query<ProviderRow>('SELECT * FROM providers WHERE provider_id = $1', [providerStringId]);
+  if (result.rows.length === 0) return null;
+  return rowToProvider(result.rows[0]);
+}
+
+export async function getAllProviders(): Promise<Provider[]> {
   const result = await query<ProviderRow>('SELECT * FROM providers ORDER BY display_name ASC');
-  return result.rows;
+  return result.rows.map(rowToProvider);
 }
 
 export async function createCustomProvider(
   providerId: string,
   displayName: string,
-  customConfig: any
-): Promise<ProviderRow> {
-  const template = {
+  customConfig: CustomProviderConfig
+): Promise<Provider> {
+  const template: ProviderTemplate = {
     id: providerId,
     displayName,
     authType: 'api_key',
     authInstructions: 'Enter your API key',
     baseUrl: customConfig.baseUrl,
     modelListEndpoint: customConfig.modelsPath || '/v1/models',
+    modelListMethod: 'POST', // Default to POST if not specified.
+    modelListHeaders: {}, // Default empty headers
+    modelListPathJsonPointer: '/data', // Default path
     chatCompletionEndpoint: customConfig.chatCompletionsPath || '/v1/chat/completions',
+    supportsStreaming: true, // Default streaming support
   };
 
   const result = await query<ProviderRow>(
@@ -95,13 +107,13 @@ export async function createCustomProvider(
      RETURNING *`,
     [providerId, displayName, JSON.stringify(template), JSON.stringify(customConfig)]
   );
-  return result.rows[0];
+  return rowToProvider(result.rows[0]);
 }
 
-export async function getProviderById(id: string): Promise<ProviderRow | null> {
+export async function getProviderById(id: string): Promise<Provider | null> {
   const result = await query<ProviderRow>('SELECT * FROM providers WHERE id = $1', [id]);
   if (result.rows.length === 0) return null;
-  return result.rows[0];
+  return rowToProvider(result.rows[0]);
 }
 
 export async function getProviderCredentialByTeamProviderAndName(teamId: string, providerUuid: string, credentialName: string): Promise<ProviderCredential | null> {
@@ -252,10 +264,17 @@ export async function hasProviderCredentials(teamId: string, providerStringId: s
 
 export async function deleteProviderWithCascade(providerUuid: string): Promise<{ credentialsDeleted: number; modelsDeleted: number }> {
   return transaction(async (client) => {
+    // Delete associated credentials
     const credResult = await client.query('DELETE FROM provider_credentials WHERE provider_id = $1', [providerUuid]);
     const credentialsDeleted = credResult.rowCount ?? 0;
-    const modelsResult = await client.query('DELETE FROM models WHERE provider_id = $1', [providerUuid]);
+
+    // Delete associated models (using provider_db_id which is providerUuid)
+    const modelsResult = await client.query('DELETE FROM models WHERE provider_db_id = $1', [providerUuid]);
     const modelsDeleted = modelsResult.rowCount ?? 0;
+    
+    // Optionally delete the provider itself if it's a custom provider
+    // await client.query('DELETE FROM providers WHERE id = $1 AND is_custom = TRUE', [providerUuid]);
+
     return { credentialsDeleted, modelsDeleted };
   });
 }

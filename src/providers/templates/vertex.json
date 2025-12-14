@@ -1,0 +1,13 @@
+{
+  "id": "google-vertex",
+  "displayName": "Google Vertex AI",
+  "authType": "service_account_json",
+  "authInstructions": "Paste your Google Cloud Service Account JSON key. Ensure the 'Vertex AI User' role is assigned.",
+  "baseUrl": "https://{{location}}-aiplatform.googleapis.com/v1",
+  "modelListEndpoint": "/projects/{{project}}/locations/{{location}}/publishers/google/models",
+  "modelListMethod": "GET",
+  "modelListHeaders": {},
+  "modelListPathJsonPointer": "/models",
+  "chatCompletionEndpoint": "/projects/{{project}}/locations/{{location}}/publishers/google/models/{{model}}:predict",
+  "supportsStreaming": false
+}

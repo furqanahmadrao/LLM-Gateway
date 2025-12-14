@@ -1,4 +1,7 @@
 // Provider credential type definitions
+import { ProviderTemplate } from './index.js'; // Import ProviderTemplate from index.js
+
+export type AuthType = 'api_key' | 'oauth' | 'aws_sigv4' | 'none' | 'service_account_json';
 
 /**
  * Configuration for custom OpenAI-compatible providers
@@ -31,6 +34,20 @@ export interface CustomProvider {
   isCustom: true;
   customConfig: CustomProviderConfig;
   createdAt: Date;
+}
+
+/**
+ * Represents a provider entry from the database (from the 'providers' table)
+ * Used for fetching registered providers, both built-in and custom.
+ */
+export interface Provider {
+  id: string; // UUID
+  provider_id: string; // String ID (e.g., 'openai')
+  display_name: string;
+  template: ProviderTemplate | CustomProviderConfig; // Corrected type
+  is_custom: boolean; // Indicates if it's a custom provider
+  custom_config: CustomProviderConfig | null; // For custom providers
+  created_at: Date;
 }
 
 export interface ProviderCredential {

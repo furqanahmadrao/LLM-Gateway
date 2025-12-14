@@ -14,6 +14,7 @@ export interface ProviderCredentials {
 
 export interface Model {
   id: string;
+  providerDbId: string;
   providerId: string;
   providerModelId: string;
   unifiedId: string;
@@ -69,6 +70,7 @@ export interface MultiProviderModel {
  * Requirements: 3.3, 3.5 - Show provider badges with health status
  */
 export interface ModelProviderEntry {
+  providerDbId: string;
   /** Provider string ID (e.g., "openai", "azure") */
   providerId: string;
   /** Provider's internal model ID */

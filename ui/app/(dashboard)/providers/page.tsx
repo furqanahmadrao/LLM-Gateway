@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import ProviderModal from './ProviderModal';
-import { isDemoMode } from '../../lib/demoMode';
+import { isDemoMode } from '../../../lib/demoMode';
 
 // API Configuration
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';

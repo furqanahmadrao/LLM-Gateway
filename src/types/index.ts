@@ -26,18 +26,10 @@ export interface TeamMember {
   lastActiveAt: Date | null;
 }
 
-export interface Provider {
-  id: string;
-  providerId: string;
-  displayName: string;
-  template: ProviderTemplate;
-  createdAt: Date;
-}
-
 export interface ProviderTemplate {
   id: string;
   displayName: string;
-  authType: 'api_key' | 'oauth' | 'aws_sigv4' | 'none';
+  authType: 'api_key' | 'oauth' | 'aws_sigv4' | 'none' | 'service_account_json'; // Explicitly include here
   authInstructions: string;
   baseUrl: string;
   modelListEndpoint: string | null;

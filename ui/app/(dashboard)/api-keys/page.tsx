@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { isDemoMode } from '../../lib/demoMode';
+import { isDemoMode } from '../../../lib/demoMode';
 
 // API Key status type
 type ApiKeyStatus = 'active' | 'revoked' | 'expired';

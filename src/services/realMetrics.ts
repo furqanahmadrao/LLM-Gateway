@@ -192,11 +192,11 @@ export async function getRealTimeMetrics(): Promise<RealTimeMetrics> {
   const latencies = await redis.zrange(LATENCY_KEY, 0, -1);
   let averageLatencyMs = 0;
   if (latencies.length > 0) {
-    const latencyValues = latencies.map(entry => {
+    const latencyValues = latencies.map((entry: string) => {
       const [latency] = entry.split(':');
       return parseFloat(latency);
     });
-    averageLatencyMs = latencyValues.reduce((a, b) => a + b, 0) / latencyValues.length;
+    averageLatencyMs = latencyValues.reduce((a: number, b: number) => a + b, 0) / latencyValues.length;
   }
   
   // Get provider-specific request counts

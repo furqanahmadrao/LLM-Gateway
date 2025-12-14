@@ -1,0 +1,13 @@
+{
+  "id": "aws-bedrock",
+  "displayName": "AWS Bedrock",
+  "authType": "aws_sigv4",
+  "authInstructions": "Enter your AWS Access Key ID, Secret Access Key, and Region.",
+  "baseUrl": "https://bedrock.{{region}}.amazonaws.com",
+  "modelListEndpoint": "/foundation-models",
+  "modelListMethod": "GET",
+  "modelListHeaders": {},
+  "modelListPathJsonPointer": "/modelSummaries",
+  "chatCompletionEndpoint": "/model/{{model}}/invoke",
+  "supportsStreaming": true
+}

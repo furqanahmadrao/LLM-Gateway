@@ -18,8 +18,10 @@ import {
 import { saveProviderCredentialsWithModelFetch } from '../services/providerConfig.js';
 import { getModelsForTeam } from '../services/providerConfig.js';
 import { registerCustomAdapter } from '../adapters/index.js';
+import type { Provider } from '../types/providers.js'; // Import Provider interface
+import type { ProviderTemplate } from '../types/index.js'; // Import ProviderTemplate
 
-const router = Router();
+const router: Router = Router();
 
 // Helper for error responses
 function createError(message: string, code: string = 'invalid_request') {
@@ -40,18 +42,21 @@ router.get('/api/providers', authMiddleware, async (req: Request, res: Response)
   try {
     const providers = await getAllProviders();
 
-    const templates = providers.map(p => ({
-      id: p.provider_id,
-      displayName: p.display_name,
-      // @ts-ignore
-      authType: p.template?.authType || 'api_key',
-      // @ts-ignore
-      authInstructions: p.template?.authInstructions || '',
-      // @ts-ignore
-      baseUrl: p.template?.baseUrl || '',
-      isCustom: p.is_custom,
-      customConfig: p.custom_config
-    }));
+    const templates = providers.map((p: Provider) => {
+      // Cast p.template to ProviderTemplate or CustomProviderConfig
+      // Check if p.template has properties of ProviderTemplate or CustomProviderConfig
+      const template: ProviderTemplate = p.template as ProviderTemplate;
+      
+      return {
+        id: p.provider_id,
+        displayName: p.display_name,
+        authType: template.authType || 'api_key',
+        authInstructions: template.authInstructions || '',
+        baseUrl: template.baseUrl || '',
+        isCustom: p.is_custom,
+        customConfig: p.custom_config
+      };
+    });
 
     res.json(templates);
   } catch (error) {
@@ -82,8 +87,10 @@ router.post('/api/providers', authMiddleware, async (req: Request, res: Response
   try {
     const provider = await createCustomProvider(providerId, displayName, customConfig);
 
-    // Register adapter in memory
-    registerCustomAdapter(provider.provider_id, provider.display_name, provider.custom_config);
+    // Register adapter in memory, only if custom_config is not null
+    if (provider.custom_config) {
+      registerCustomAdapter(provider.provider_id, provider.display_name, provider.custom_config);
+    }
 
     res.status(201).json({
       id: provider.provider_id,

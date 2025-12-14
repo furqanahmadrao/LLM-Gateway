@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { isDemoMode } from '../../lib/demoMode';
+import { isDemoMode } from '../../../lib/demoMode';
 
 // Member role type
 type MemberRole = 'admin' | 'member' | 'viewer';

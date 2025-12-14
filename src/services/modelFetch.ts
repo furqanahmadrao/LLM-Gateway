@@ -9,7 +9,7 @@
 
 import { getAdapterForProvider } from '../adapters/index.js';
 import { decrypt } from './encryption.js';
-import { upsertModel, deleteModelsByProviderId } from '../db/repositories/models.js';
+import { upsertModel, deleteModelsByProviderDbId } from '../db/repositories/models.js';
 import { 
   updateProviderCredentialStatus, 
   updateProviderCredentialSyncTime,
@@ -178,7 +178,7 @@ export async function refreshModelsForProvider(
  * @returns Number of models deleted
  */
 export async function deleteModelsForProvider(providerUuid: string): Promise<number> {
-  return deleteModelsByProviderId(providerUuid);
+  return deleteModelsByProviderDbId(providerUuid);
 }
 
 /**

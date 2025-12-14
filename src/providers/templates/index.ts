@@ -8,6 +8,9 @@ import azureTemplate from './azure.json' with { type: 'json' };
 import mistralTemplate from './mistral.json' with { type: 'json' };
 import groqTemplate from './groq.json' with { type: 'json' };
 import cohereTemplate from './cohere.json' with { type: 'json' };
+import geminiTemplate from './gemini.json' with { type: 'json' };
+import bedrockTemplate from './bedrock.json' with { type: 'json' };
+import vertexTemplate from './vertex.json' with { type: 'json' };
 
 // Built-in provider templates
 const builtInTemplates: Map<string, ProviderTemplate> = new Map([
@@ -17,6 +20,9 @@ const builtInTemplates: Map<string, ProviderTemplate> = new Map([
   ['mistral', mistralTemplate as ProviderTemplate],
   ['groq', groqTemplate as ProviderTemplate],
   ['cohere', cohereTemplate as ProviderTemplate],
+  ['google-gemini', geminiTemplate as ProviderTemplate],
+  ['aws-bedrock', bedrockTemplate as ProviderTemplate],
+  ['google-vertex', vertexTemplate as ProviderTemplate],
 ]);
 
 /**

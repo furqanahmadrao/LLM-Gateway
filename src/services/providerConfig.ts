@@ -16,14 +16,14 @@ import {
   getProviderByStringId,
   getAllProviders,
 } from '../db/repositories/providers.js';
-import { createModel, deleteModelsByProviderId, getModelsByProviderId } from '../db/repositories/models.js';
+import { createModel, deleteModelsByProviderDbId, getModelsByProviderDbId } from '../db/repositories/models.js';
 import {
   setCachedProviderModels,
   invalidateTeamModelCache,
   onCredentialDelete,
 } from './modelCache.js';
 import { getAdapterForProvider, registerCustomAdapter } from '../adapters/index.js';
-import type { ProviderCredentialInput, ProviderCredential } from '../types/providers.js';
+import type { ProviderCredentialInput, ProviderCredential, Provider } from '../types/providers.js'; // Import Provider
 import type { UnifiedModel } from '../types/models.js';
 
 /**
@@ -32,7 +32,7 @@ import type { UnifiedModel } from '../types/models.js';
 export async function initializeCustomProviders(): Promise<void> {
   try {
     const providers = await getAllProviders();
-    const customProviders = providers.filter(p => p.is_custom);
+    const customProviders = providers.filter((p: Provider) => p.is_custom); // Cast to Provider
 
     for (const provider of customProviders) {
       if (provider.custom_config) {
@@ -123,16 +123,23 @@ export async function fetchAndCacheModels(
     apiKey: credentials.apiKey || credentials.api_key || '',
     resourceName: credentials.resourceName || credentials.resource_name,
     deploymentId: credentials.deploymentId || credentials.deployment_id,
+    serviceAccountJson: credentials.serviceAccountJson, // For Vertex AI
+    projectId: credentials.projectId, // For Vertex AI
+    location: credentials.location, // For Vertex AI
+    accessKeyId: credentials.accessKeyId, // For AWS Bedrock
+    secretAccessKey: credentials.secretAccessKey, // For AWS Bedrock
+    sessionToken: credentials.sessionToken, // For AWS Bedrock
+    region: credentials.region, // For AWS Bedrock
   });
 
   // Delete existing models for this provider (to refresh)
-  await deleteModelsByProviderId(provider.id);
+  await deleteModelsByProviderDbId(provider.id); // Renamed
 
   // Store models in database
   const storedModels: UnifiedModel[] = [];
   for (const model of providerModels) {
     const dbModel = await createModel(
-      provider.id,
+      provider.id, // provider.id is providerDbId (UUID)
       model.id,
       model.displayName || model.id,
       model.description,
@@ -141,7 +148,7 @@ export async function fetchAndCacheModels(
 
     storedModels.push({
       id: dbModel.id,
-      providerId: providerStringId,
+      providerId: providerStringId, // Use providerStringId from parameter
       providerModelId: model.id,
       unifiedId: dbModel.unifiedId,
       displayName: dbModel.displayName,
@@ -209,19 +216,19 @@ export async function getModelsForTeam(teamId: string): Promise<UnifiedModel[]> 
   
   interface ModelWithProvider {
     id: string;
-    provider_id: string;
+    provider_db_id: string; // Changed from provider_id
+    provider_id: string; // The string identifier
     provider_model_id: string;
     unified_id: string;
     display_name: string | null;
     context_length: number | null;
-    provider_string_id: string;
   }
 
   // Get all models from providers that the team has credentials for
   const result = await query<ModelWithProvider>(
-    `SELECT m.*, p.provider_id as provider_string_id
+    `SELECT m.id, m.provider_db_id, m.provider_id, m.provider_model_id, m.unified_id, m.display_name, m.context_length
      FROM models m
-     JOIN providers p ON m.provider_id = p.id
+     JOIN providers p ON m.provider_db_id = p.id
      JOIN provider_credentials pc ON pc.provider_id = p.id
      WHERE pc.team_id = $1`,
     [teamId]
@@ -229,7 +236,7 @@ export async function getModelsForTeam(teamId: string): Promise<UnifiedModel[]> 
 
   return result.rows.map(row => ({
     id: row.id,
-    providerId: row.provider_string_id,
+    providerId: row.provider_id, // Use m.provider_id directly
     providerModelId: row.provider_model_id,
     unifiedId: row.unified_id,
     displayName: row.display_name,

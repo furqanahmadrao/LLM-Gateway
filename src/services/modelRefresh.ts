@@ -15,7 +15,8 @@ import {
   updateProviderCredentialSyncTime
 } from '../db/repositories/providers.js';
 import { createLogger, Logger } from './logger.js';
-import type { ProviderCredential } from '../types/providers.js';
+import type { ProviderCredential, Provider } from '../types/providers.js'; // Import Provider
+import { getModelsByProviderDbId } from '../db/repositories/models.js'; // Import getModelsByProviderDbId
 
 /**
  * Configuration for the refresh service
@@ -494,7 +495,7 @@ export class ModelRefreshService {
       if (!provider) continue;
       
       // Type assertion for provider_id field
-      const providerStringId = (provider as unknown as { provider_id: string }).provider_id;
+      const providerStringId = (provider as unknown as Provider).provider_id;
       
       // Reset retry state to allow immediate refresh
       this.resetRetryState(credential.id);
@@ -514,7 +515,6 @@ export class ModelRefreshService {
     providerStringId: string
   ): Promise<RefreshStatus | null> {
     const { getDefaultCredential } = await import('../db/repositories/providers.js');
-    const { getModelsByProviderId } = await import('../db/repositories/models.js');
     
     const credential = await getDefaultCredential(teamId, providerStringId);
     if (!credential) {
@@ -526,7 +526,7 @@ export class ModelRefreshService {
       return null;
     }
 
-    const models = await getModelsByProviderId(provider.id);
+    const models = await getModelsByProviderDbId(provider.id); // Changed to getModelsByProviderDbId
     const state = this.getProviderState(credential.id);
     const ttl = this.getTtlForProvider(providerStringId);
 

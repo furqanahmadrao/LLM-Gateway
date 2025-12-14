@@ -1,0 +1,13 @@
+{
+  "id": "google-gemini",
+  "displayName": "Google Gemini",
+  "authType": "api_key",
+  "authInstructions": "Enter your Google AI Studio API Key. Get one at makersuite.google.com.",
+  "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+  "modelListEndpoint": "/models",
+  "modelListMethod": "GET",
+  "modelListHeaders": {},
+  "modelListPathJsonPointer": "/models",
+  "chatCompletionEndpoint": "/models/{{model}}:generateContent",
+  "supportsStreaming": true
+}

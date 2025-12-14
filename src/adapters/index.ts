@@ -11,6 +11,9 @@ import { AnthropicAdapter } from './anthropic.js';
 import { AzureAdapter } from './azure.js';
 import { MistralAdapter } from './mistral.js';
 import { GroqAdapter } from './groq.js';
+import { GeminiAdapter } from './gemini.js';
+import { BedrockAdapter } from './bedrock.js';
+import { VertexAdapter } from './vertex.js'; // Import Vertex
 import { CustomOpenAIAdapter } from './custom.js';
 import { CustomProviderConfig } from '../types/providers.js';
 
@@ -55,6 +58,15 @@ export function getAdapterForProvider(providerId: string): ProviderAdapter | nul
       break;
     case 'groq':
       adapter = new GroqAdapter();
+      break;
+    case 'google-gemini':
+      adapter = new GeminiAdapter();
+      break;
+    case 'aws-bedrock':
+      adapter = new BedrockAdapter();
+      break;
+    case 'google-vertex': // Add Vertex
+      adapter = new VertexAdapter();
       break;
     default:
       return null;
@@ -117,7 +129,7 @@ export function isCustomProvider(providerId: string): boolean {
  * Get all available provider IDs that have adapters
  */
 export function getAvailableProviderIds(): string[] {
-  const builtIn = ['openai', 'anthropic', 'azure', 'mistral', 'groq'];
+  const builtIn = ['openai', 'anthropic', 'azure', 'mistral', 'groq', 'google-gemini', 'aws-bedrock', 'google-vertex']; // Add vertex
   const custom = Array.from(customAdapters.keys());
   return [...builtIn, ...custom];
 }
@@ -136,4 +148,7 @@ export { AnthropicAdapter } from './anthropic.js';
 export { AzureAdapter } from './azure.js';
 export { MistralAdapter } from './mistral.js';
 export { GroqAdapter } from './groq.js';
+export { GeminiAdapter } from './gemini.js';
+export { BedrockAdapter } from './bedrock.js';
+export { VertexAdapter } from './vertex.js'; // Export Vertex
 export { CustomOpenAIAdapter, buildAuthHeaderValue, buildModelsEndpoint } from './custom.js';

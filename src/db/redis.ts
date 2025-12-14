@@ -1,11 +1,11 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-const redis = new Redis.default(redisUrl, {
+const redis = new Redis(redisUrl, {
   maxRetriesPerRequest: 3,
   lazyConnect: true,
 });
@@ -108,7 +108,7 @@ export async function closeRedis(): Promise<void> {
 }
 
 // Get raw client for advanced operations
-export function getRedisClient(): Redis.default {
+export function getRedisClient(): Redis {
   return redis;
 }
 

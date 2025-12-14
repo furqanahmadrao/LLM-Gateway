@@ -9,6 +9,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { validateApiKey } from '../services/auth.js';
+import { verifyToken } from '../services/authService.js'; // Import JWT verification
 import type { ApiKeyContext } from '../types/api.js';
 
 // Extend Express Request to include auth context
@@ -63,29 +64,51 @@ export function extractApiKey(authHeader: string | undefined): string | null {
 }
 
 /**
- * Authentication middleware that validates API keys
+ * Authentication middleware that validates API keys OR Session Cookies
  * 
- * - Extracts API key from Authorization header
- * - Validates key against database
- * - Checks for revocation and expiration
+ * - Checks 'auth_token' cookie first (UI Session)
+ * - Checks 'Authorization' header second (API Key)
+ * - Validates against DB
  * - Attaches auth context to request on success
  * - Returns 401 on failure
- * 
- * Requirements: 5.2, 5.3, 5.5
  */
 export async function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  // 1. Check for Session Cookie (UI Access)
+  const sessionToken = req.cookies?.auth_token;
+  if (sessionToken) {
+    const user = await verifyToken(sessionToken);
+    if (user) {
+      // Create a context for the user session
+      // For now, we assume a default role/permissions or we need to fetch them.
+      // Since the schema is new, we'll give basic access.
+      req.auth = {
+        keyId: 'session',
+        teamId: 'default-team', // TODO: Fetch from user's active team
+        projectId: 'default-project',
+        role: 'admin', // TODO: Fetch real role
+        permissions: ['*'], // Admin access for now
+      };
+      next();
+      return;
+    }
+    // If token invalid, fall through to API key check? 
+    // Or fail? Usually fail if cookie is present but bad.
+    // But let's check API key just in case.
+  }
+
+  // 2. Check for API Key (Programmatic Access)
   const authHeader = req.headers.authorization;
   const apiKey = extractApiKey(authHeader);
 
-  // No API key provided
+  // No credentials provided
   if (!apiKey) {
     res.status(401).json(createAuthError(
-      'API key is required. Provide it in the Authorization header.',
-      'missing_api_key'
+      'Authentication required. Please log in or provide an API key.',
+      'missing_credentials'
     ));
     return;
   }

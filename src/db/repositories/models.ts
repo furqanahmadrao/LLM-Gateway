@@ -4,7 +4,8 @@ import type { Model, ModelAlias, UnifiedModel, ResolvedModel, MultiProviderModel
 
 interface ModelRow {
   id: string;
-  provider_id: string;
+  provider_db_id: string; // The UUID of the provider in the database
+  provider_id: string;    // The string identifier of the provider (e.g., 'openai')
   provider_model_id: string;
   unified_id: string;
   display_name: string | null;
@@ -23,8 +24,8 @@ interface ModelAliasRow {
 }
 
 interface ProviderRow {
-  id: string;
-  provider_id: string;
+  id: string; // UUID of the provider
+  provider_id: string; // String identifier of the provider (e.g., 'openai')
 }
 
 /**
@@ -65,6 +66,7 @@ export function isValidUnifiedId(unifiedId: string): boolean {
 function rowToModel(row: ModelRow): Model {
   return {
     id: row.id,
+    providerDbId: row.provider_db_id, // Map provider_db_id
     providerId: row.provider_id,
     providerModelId: row.provider_model_id,
     unifiedId: row.unified_id,
@@ -90,7 +92,7 @@ function rowToModelAlias(row: ModelAliasRow): ModelAlias {
  * Create a new model in the database
  */
 export async function createModel(
-  providerId: string,
+  providerDbId: string, // Changed from providerId to providerDbId
   providerModelId: string,
   displayName?: string | null,
   description?: string | null,
@@ -101,20 +103,21 @@ export async function createModel(
   // Get the provider's string ID for unified ID generation
   const providerResult = await query<ProviderRow>(
     'SELECT provider_id FROM providers WHERE id = $1',
-    [providerId]
+    [providerDbId]
   );
   
   if (providerResult.rows.length === 0) {
-    throw new Error(`Provider not found: ${providerId}`);
+    throw new Error(`Provider not found with DB ID: ${providerDbId}`);
   }
   
-  const unifiedId = generateUnifiedId(providerResult.rows[0].provider_id, providerModelId);
+  const providerStringId = providerResult.rows[0].provider_id;
+  const unifiedId = generateUnifiedId(providerStringId, providerModelId);
   
   const result = await query<ModelRow>(
-    `INSERT INTO models (id, provider_id, provider_model_id, unified_id, display_name, description, context_length)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO models (id, provider_db_id, provider_id, provider_model_id, unified_id, display_name, description, context_length)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
-    [id, providerId, providerModelId, unifiedId, displayName ?? null, description ?? null, contextLength ?? null]
+    [id, providerDbId, providerStringId, providerModelId, unifiedId, displayName ?? null, description ?? null, contextLength ?? null]
   );
   
   return rowToModel(result.rows[0]);
@@ -124,7 +127,7 @@ export async function createModel(
  * Get a model by its ID
  */
 export async function getModelById(id: string): Promise<Model | null> {
-  const result = await query<ModelRow>('SELECT * FROM models WHERE id = $1', [id]);
+  const result = await query<ModelRow>('SELECT m.*, p.provider_id FROM models m JOIN providers p ON m.provider_db_id = p.id WHERE m.id = $1', [id]);
   if (result.rows.length === 0) return null;
   return rowToModel(result.rows[0]);
 }
@@ -133,7 +136,7 @@ export async function getModelById(id: string): Promise<Model | null> {
  * Get a model by its unified ID
  */
 export async function getModelByUnifiedId(unifiedId: string): Promise<Model | null> {
-  const result = await query<ModelRow>('SELECT * FROM models WHERE unified_id = $1', [unifiedId]);
+  const result = await query<ModelRow>('SELECT m.*, p.provider_id FROM models m JOIN providers p ON m.provider_db_id = p.id WHERE m.unified_id = $1', [unifiedId]);
   if (result.rows.length === 0) return null;
   return rowToModel(result.rows[0]);
 }
@@ -141,10 +144,10 @@ export async function getModelByUnifiedId(unifiedId: string): Promise<Model | nu
 /**
  * Get all models for a provider
  */
-export async function getModelsByProviderId(providerId: string): Promise<Model[]> {
+export async function getModelsByProviderDbId(providerDbId: string): Promise<Model[]> { // Renamed from getModelsByProviderId
   const result = await query<ModelRow>(
-    'SELECT * FROM models WHERE provider_id = $1 ORDER BY unified_id',
-    [providerId]
+    'SELECT m.*, p.provider_id FROM models m JOIN providers p ON m.provider_db_id = p.id WHERE m.provider_db_id = $1 ORDER BY unified_id',
+    [providerDbId]
   );
   return result.rows.map(rowToModel);
 }
@@ -160,8 +163,8 @@ export async function deleteModel(id: string): Promise<boolean> {
 /**
  * Delete all models for a provider
  */
-export async function deleteModelsByProviderId(providerId: string): Promise<number> {
-  const result = await query('DELETE FROM models WHERE provider_id = $1', [providerId]);
+export async function deleteModelsByProviderDbId(providerDbId: string): Promise<number> { // Renamed from deleteModelsByProviderId
+  const result = await query('DELETE FROM models WHERE provider_db_id = $1', [providerDbId]);
   return result.rowCount ?? 0;
 }
 
@@ -192,7 +195,7 @@ export function extractCanonicalName(providerModelId: string): string {
  * Requirements: 3.1 - Store separate model entries for each provider
  */
 export async function upsertModel(
-  providerId: string,
+  providerDbId: string, // Changed from providerId to providerDbId
   providerModelId: string,
   displayName?: string | null,
   description?: string | null,
@@ -201,11 +204,11 @@ export async function upsertModel(
   // Get the provider's string ID for unified ID generation
   const providerResult = await query<ProviderRow>(
     'SELECT provider_id FROM providers WHERE id = $1',
-    [providerId]
+    [providerDbId]
   );
   
   if (providerResult.rows.length === 0) {
-    throw new Error(`Provider not found: ${providerId}`);
+    throw new Error(`Provider not found with DB ID: ${providerDbId}`);
   }
   
   const providerStringId = providerResult.rows[0].provider_id;
@@ -213,8 +216,8 @@ export async function upsertModel(
   
   // Check if model already exists for this provider
   const existing = await query<ModelRow>(
-    'SELECT * FROM models WHERE provider_id = $1 AND provider_model_id = $2',
-    [providerId, providerModelId]
+    'SELECT m.*, p.provider_id FROM models m JOIN providers p ON m.provider_db_id = p.id WHERE m.provider_db_id = $1 AND m.provider_model_id = $2',
+    [providerDbId, providerModelId]
   );
   
   if (existing.rows.length > 0) {
@@ -225,9 +228,9 @@ export async function upsertModel(
            description = COALESCE($2, description),
            context_length = COALESCE($3, context_length),
            updated_at = NOW()
-       WHERE provider_id = $4 AND provider_model_id = $5
-       RETURNING *`,
-      [displayName ?? null, description ?? null, contextLength ?? null, providerId, providerModelId]
+       WHERE provider_db_id = $4 AND provider_model_id = $5
+       RETURNING m.*, (SELECT provider_id FROM providers WHERE id = m.provider_db_id) as provider_id`, // Include provider_id for rowToModel
+      [displayName ?? null, description ?? null, contextLength ?? null, providerDbId, providerModelId]
     );
     return rowToModel(result.rows[0]);
   }
@@ -235,10 +238,10 @@ export async function upsertModel(
   // Create new model entry
   const id = uuidv4();
   const result = await query<ModelRow>(
-    `INSERT INTO models (id, provider_id, provider_model_id, unified_id, display_name, description, context_length)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO models (id, provider_db_id, provider_id, provider_model_id, unified_id, display_name, description, context_length)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
-    [id, providerId, providerModelId, unifiedId, displayName ?? null, description ?? null, contextLength ?? null]
+    [id, providerDbId, providerStringId, providerModelId, unifiedId, displayName ?? null, description ?? null, contextLength ?? null]
   );
   
   return rowToModel(result.rows[0]);
@@ -253,11 +256,12 @@ export async function getModelsByCanonicalName(canonicalName: string): Promise<M
   // We need to find models where the provider_model_id matches the canonical name
   // or where extracting the canonical name from provider_model_id matches
   const result = await query<ModelRow>(
-    `SELECT * FROM models 
-     WHERE provider_model_id = $1 
-        OR provider_model_id LIKE $2
-        OR provider_model_id LIKE $3
-     ORDER BY provider_id`,
+    `SELECT m.*, p.provider_id FROM models m 
+     JOIN providers p ON m.provider_db_id = p.id
+     WHERE m.provider_model_id = $1 
+        OR m.provider_model_id LIKE $2
+        OR m.provider_model_id LIKE $3
+     ORDER BY m.provider_id`,
     [canonicalName, `${canonicalName}-%`, `${canonicalName}@%`]
   );
   
@@ -275,31 +279,48 @@ export async function getModelsByCanonicalName(canonicalName: string): Promise<M
  * 
  * Requirements: 3.2, 3.3, 3.5 - Group models by canonical name with provider badges and health status
  */
-export async function getModelsGroupedByCanonicalName(teamId: string): Promise<MultiProviderModel[]> {
-  // Get all models with their provider info and credential status
+export async function getModelsGroupedByCanonicalNameForTeam(teamId: string): Promise<MultiProviderModel[]> {
+  // Get all models with their provider info and credential status FOR A GIVEN TEAM
   const result = await query<ModelRow & { 
     provider_string_id: string; 
     credential_status: string | null;
     credential_priority: number | null;
   }>(
-    `SELECT m.*, 
-            p.provider_id as provider_string_id,
+    `SELECT m.id, m.provider_db_id, p.provider_id as provider_string_id, m.provider_model_id, m.unified_id, 
+            m.display_name, m.description, m.context_length, m.created_at, m.updated_at,
             pc.status as credential_status,
             pc.priority as credential_priority
      FROM models m
-     JOIN providers p ON m.provider_id = p.id
-     LEFT JOIN provider_credentials pc ON pc.provider_id = p.id AND pc.team_id = $1
-     ORDER BY m.provider_model_id, pc.priority ASC NULLS LAST`,
+     JOIN providers p ON m.provider_db_id = p.id
+     JOIN provider_credentials pc ON pc.provider_id = p.id AND pc.team_id = $1
+     WHERE pc.status = 'active' OR pc.status = 'error' -- Include error status to show issues
+     ORDER BY m.display_name ASC, p.provider_id ASC`,
     [teamId]
   );
   
-  // Group by canonical name
+  // Get aliases for the team
+  const aliasesResult = await query<ModelAliasRow>(
+    `SELECT ma.* FROM model_aliases ma
+     JOIN models m ON ma.model_id = m.id
+     JOIN provider_credentials pc ON pc.provider_id = m.provider_db_id AND pc.team_id = $1`,
+    [teamId]
+  );
+  const aliasesMap = new Map<string, string[]>();
+  for (const aliasRow of aliasesResult.rows) {
+      if (!aliasesMap.has(aliasRow.model_id)) {
+          aliasesMap.set(aliasRow.model_id, []);
+      }
+      aliasesMap.get(aliasRow.model_id)?.push(aliasRow.alias);
+  }
+
   const groupedMap = new Map<string, MultiProviderModel>();
   
   for (const row of result.rows) {
     const canonicalName = extractCanonicalName(row.provider_model_id);
-    
+    const modelDisplayName = row.display_name || row.provider_model_id;
+
     const providerEntry: ModelProviderEntry = {
+      providerDbId: row.provider_db_id,
       providerId: row.provider_string_id,
       providerModelId: row.provider_model_id,
       unifiedId: row.unified_id,
@@ -308,16 +329,24 @@ export async function getModelsGroupedByCanonicalName(teamId: string): Promise<M
       priority: row.credential_priority ?? 999,
     };
     
+    // Add aliases to the provider entry
+    if (aliasesMap.has(row.id)) {
+      (providerEntry as any).aliases = aliasesMap.get(row.id);
+    } else {
+      (providerEntry as any).aliases = [];
+    }
+
     if (groupedMap.has(canonicalName)) {
       const existing = groupedMap.get(canonicalName)!;
-      // Only add if this provider isn't already in the list
-      if (!existing.providers.some(p => p.providerId === providerEntry.providerId)) {
-        existing.providers.push(providerEntry);
+      existing.providers.push(providerEntry);
+      // Ensure display name is consistent, prefer the canonical one
+      if (existing.displayName === undefined) {
+        existing.displayName = modelDisplayName;
       }
     } else {
       groupedMap.set(canonicalName, {
         canonicalName,
-        displayName: row.display_name,
+        displayName: modelDisplayName, // Default display name to the first model's display name
         description: row.description,
         providers: [providerEntry],
       });
@@ -347,12 +376,12 @@ export async function getBestProviderForModel(
     credential_status: string | null;
     credential_priority: number | null;
   }>(
-    `SELECT m.*, 
-            p.provider_id as provider_string_id,
+    `SELECT m.id, m.provider_db_id, p.provider_id as provider_string_id, m.provider_model_id, m.unified_id, 
+            m.display_name, m.description, m.context_length, m.created_at, m.updated_at,
             pc.status as credential_status,
             pc.priority as credential_priority
      FROM models m
-     JOIN providers p ON m.provider_id = p.id
+     JOIN providers p ON m.provider_db_id = p.id
      LEFT JOIN provider_credentials pc ON pc.provider_id = p.id AND pc.team_id = $1
      WHERE pc.status = 'active'
      ORDER BY pc.priority ASC NULLS LAST, m.created_at ASC`,
@@ -364,6 +393,7 @@ export async function getBestProviderForModel(
     const extracted = extractCanonicalName(row.provider_model_id);
     if (extracted === canonicalName || row.provider_model_id === canonicalName) {
       return {
+        providerDbId: row.provider_db_id,
         providerId: row.provider_string_id,
         providerModelId: row.provider_model_id,
         unifiedId: row.unified_id,
@@ -456,7 +486,7 @@ export async function getAliasesByModelId(modelId: string): Promise<ModelAlias[]
  */
 export async function getAliasesByTeamId(teamId: string): Promise<ModelAlias[]> {
   const result = await query<ModelAliasRow>(
-    'SELECT * FROM model_aliases WHERE team_id = $1 OR team_id IS NULL',
+    `SELECT ma.* FROM model_aliases ma JOIN models m ON ma.model_id = m.id JOIN provider_credentials pc ON pc.provider_id = m.provider_db_id WHERE pc.team_id = $1 OR ma.team_id IS NULL`,
     [teamId]
   );
   return result.rows.map(rowToModelAlias);
@@ -477,7 +507,7 @@ export async function resolveModelIdentifier(
       // Get provider string ID
       const providerResult = await query<ProviderRow>(
         'SELECT provider_id FROM providers WHERE id = $1',
-        [model.providerId]
+        [model.providerDbId]
       );
       if (providerResult.rows.length > 0) {
         return {
@@ -495,7 +525,7 @@ export async function resolveModelIdentifier(
   if (model) {
     const providerResult = await query<ProviderRow>(
       'SELECT provider_id FROM providers WHERE id = $1',
-      [model.providerId]
+      [model.providerDbId]
     );
     if (providerResult.rows.length > 0) {
       return {
